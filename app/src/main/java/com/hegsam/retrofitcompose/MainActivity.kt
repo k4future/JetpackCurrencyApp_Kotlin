@@ -13,6 +13,7 @@ import androidx.compose.material.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -21,14 +22,14 @@ import androidx.compose.ui.unit.dp
 import com.hegsam.retrofitcompose.model.CryptoModel
 import com.hegsam.retrofitcompose.service.CryptoAPI
 import com.hegsam.retrofitcompose.ui.theme.RetrofitComposeTheme
-import retrofit2.Call
-import retrofit2.Callback
-import retrofit2.Response
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 class MainActivity : ComponentActivity() {
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,36 +45,10 @@ class MainActivity : ComponentActivity() {
 fun MainScreen ()
 {
     val cryptoList = remember {mutableStateListOf<CryptoModel>()}
-    val baseURL = "https://api.nomics.com/v1/"
-    val retrofit = Retrofit.Builder()
-        .addConverterFactory(GsonConverterFactory.create())
-        .baseUrl(baseURL)
-        .build()
-        .create(CryptoAPI::class.java)
-
-    val call = retrofit.getData()
-
-    call.enqueue(object : Callback<List<CryptoModel>>
-    {
-        override fun onResponse(call: Call<List<CryptoModel>>, response: Response<List<CryptoModel>>)
-        {
-            if (response.isSuccessful)
-            {
-                response.body()?.let {
-                    cryptoList.addAll(it)
-                }
-            }
-        }
-
-        override fun onFailure(call: Call<List<CryptoModel>>, t: Throwable) {
-            t.printStackTrace()
-        }
-    })
-
+    getData(cryptoList)
     Scaffold(topBar = {AppBar()}) {
         CryptoList(cryptos = cryptoList)
     }
-
 }
 
 @Composable
@@ -119,4 +94,28 @@ fun DefaultPreview() {
     RetrofitComposeTheme {
         CryptoRow(crypto = CryptoModel("BTC","-1"))
     }
+}
+
+fun getData (list : SnapshotStateList<CryptoModel>)
+{
+    val baseURL = "https://api.nomics.com/v1/"
+    val retrofit = Retrofit.Builder()
+        .addConverterFactory(GsonConverterFactory.create())
+        .baseUrl(baseURL)
+        .build()
+        .create(CryptoAPI::class.java)
+
+    CoroutineScope (Dispatchers.IO).launch {
+        val response = retrofit.getData()
+        withContext(Dispatchers.Main)
+        {
+            if (response.isSuccessful)
+            {
+                response.body()?.let {
+                    list.addAll(it)
+                }
+            }
+        }
+    }
+
 }
